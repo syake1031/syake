@@ -84,7 +84,7 @@ class MyPage extends StatelessWidget {
                   const SizedBox(width: 8), // ボタン間のスペースを追加
                   OutlinedButton(
                     onPressed: () {},
-                    child: const Text('メッセージ'),
+                    child: const Text('メッセージ！！！'),
                     style: OutlinedButton.styleFrom(
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
