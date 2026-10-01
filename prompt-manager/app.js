@@ -186,19 +186,63 @@ function renderPromptItem(p, index) {
   return li;
 }
 
+const PRESET_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
+
 function renderPresetItem(p) {
   return el('li', { className: 'preset-item' }, [
-    el('div', { className: 'preset-head' }, [
-      el('span', { className: 'preset-name', textContent: p.name }),
-      el('div', { className: 'item-actions' }, [
-        button('読込', () => loadPreset(p.id), 'btn small primary'),
-        button('更新', () => updatePreset(p.id), 'btn small', { title: '現在の結合結果で上書き' }),
-        button('名前変更', () => renamePreset(p.id)),
-        button('削除', () => deletePreset(p.id), 'btn small danger'),
-      ]),
-    ]),
+    el('span', { className: 'preset-icon', innerHTML: PRESET_ICON }),
+    el('span', { className: 'preset-name', textContent: p.name }),
     el('div', { className: 'preset-text', textContent: p.text }),
+    el('div', { className: 'preset-actions' }, [
+      button('読込', () => loadPreset(p.id), 'btn small primary'),
+      button('更新', () => updatePreset(p.id), 'btn small', { title: '現在の結合結果で上書き' }),
+      button('名前変更', () => renamePreset(p.id)),
+      button('削除', () => deletePreset(p.id), 'btn small danger'),
+    ]),
   ]);
+}
+
+const RING_CIRCUMFERENCE = 2 * Math.PI * 50;
+const MAX_BARS = 16;
+
+function renderStats() {
+  const total = state.prompts.length;
+  const on = state.prompts.filter(p => p.enabled).length;
+  const output = combined();
+  const pct = total ? Math.round((on / total) * 100) : 0;
+
+  $('stat-total').textContent = total;
+  $('stat-on').textContent = on;
+  $('stat-chars').textContent = output.length;
+  $('count').textContent = `${total} 件（選択中 ${on} 件）`;
+
+  // 選択状況の帯：選択中・未選択の比率で幅を変える
+  const offPct = total ? 100 - pct : 0;
+  const cols = total ? `${Math.max(pct, 22)}fr ${Math.max(offPct, 22)}fr 80px` : '1fr 1fr 80px';
+  document.querySelector('.segments').style.setProperty('--seg-cols', cols);
+  $('seg-on').textContent = `${pct}%`;
+  $('seg-off').textContent = `${offPct}%`;
+  $('seg-sets').textContent = state.presets.length;
+
+  // リング
+  $('ring-value').style.strokeDashoffset = RING_CIRCUMFERENCE * (1 - pct / 100);
+  $('ring-pct').textContent = `${pct}%`;
+  $('ring-sub').textContent = `${on} / ${total} 件`;
+
+  // 文字数バー
+  const shown = state.prompts.slice(0, MAX_BARS);
+  const max = Math.max(1, ...shown.map(p => p.text.length));
+  $('bars-total').textContent = state.prompts.filter(p => p.enabled).reduce((n, p) => n + p.text.length, 0);
+  $('bars').replaceChildren(...(shown.length
+    ? shown.map(p => {
+        const bar = el('span', { className: 'bar' + (p.enabled ? ' on' : ''), title: `${p.text}（${p.text.length}文字）` });
+        bar.dataset.len = p.text.length;
+        bar.style.setProperty('--h', `${Math.max(8, (p.text.length / max) * 100)}%`);
+        return bar;
+      })
+    : [el('span', { className: 'bars-empty', textContent: 'データがありません' })]));
+
+  $('preset-count').textContent = state.presets.length;
 }
 
 function render() {
@@ -206,14 +250,27 @@ function render() {
   list.replaceChildren(...state.prompts.map(renderPromptItem));
   $('empty').classList.toggle('hidden', state.prompts.length > 0);
 
-  const enabledCount = state.prompts.filter(p => p.enabled).length;
-  $('count').textContent = `${state.prompts.length} 件（選択中 ${enabledCount} 件）`;
-
   $('separator').value = state.separator;
   $('output').value = combined();
 
   $('preset-list').replaceChildren(...state.presets.map(renderPresetItem));
   $('preset-empty').classList.toggle('hidden', state.presets.length > 0);
+
+  renderStats();
+}
+
+async function copyOutput() {
+  const status = $('copy-status');
+  const text = $('output').value;
+  if (!text) { status.textContent = 'コピーする内容がありません'; return; }
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    $('output').select();
+    document.execCommand('copy');
+  }
+  status.textContent = 'コピーしました';
+  setTimeout(() => { status.textContent = ''; }, 2000);
 }
 
 // ---- イベント ----
@@ -240,20 +297,14 @@ function init() {
 
   $('separator').onchange = e => { state.separator = e.target.value; commit(); };
 
-  $('copy').onclick = async () => {
-    const status = $('copy-status');
-    const text = $('output').value;
-    if (!text) { status.textContent = 'コピーする内容がありません'; return; }
-    try {
-      await navigator.clipboard.writeText(text);
-      status.textContent = 'コピーしました';
-    } catch {
-      $('output').select();
-      document.execCommand('copy');
-      status.textContent = 'コピーしました';
-    }
-    setTimeout(() => { status.textContent = ''; }, 2000);
-  };
+  $('copy').onclick = copyOutput;
+  $('copy-top').onclick = copyOutput;
+
+  document.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('click', () => {
+      document.querySelectorAll('.nav-link').forEach(l => l.classList.toggle('active', l === link));
+    });
+  });
 
   $('preset-form').addEventListener('submit', e => {
     e.preventDefault();
