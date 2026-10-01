@@ -16,7 +16,11 @@ HTML / CSS / JavaScript のみで動作し、ビルドやサーバーは不要�
 
 ## 使い方
 
-`index.html` をブラウザで開くだけで使えます。
+公開版：https://syake1031.github.io/syake/
+
+`main` ブランチに push すると GitHub Actions（`.github/workflows/pages.yml`）で自動的に GitHub Pages へデプロイされます。
+
+ローカルでは `index.html` をブラウザで開くだけで使えます。
 
 ローカルサーバーで動かす場合：
 
@@ -25,8 +29,6 @@ npx serve .
 # または
 python3 -m http.server 8000
 ```
-
-GitHub Pages で公開する場合は、リポジトリの Settings → Pages で `main` ブランチのルートを指定してください。
 
 ## ファイル構成
 
