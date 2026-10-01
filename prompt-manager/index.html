@@ -4,12 +4,23 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>プロンプト管理</title>
+  <meta name="theme-color" content="#07080d">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700;800&display=swap">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="app-header">
-    <h1>プロンプト管理</h1>
-    <p class="subtitle">プロンプトを登録して、カンマ区切りの1つの文章にまとめます</p>
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 17l6-6-6-6"/><path d="M12 19h8"/>
+      </svg>
+    </div>
+    <div>
+      <h1>プロンプト管理</h1>
+      <p class="subtitle">プロンプトを登録して、カンマ区切りの1つの文章にまとめます</p>
+    </div>
   </header>
 
   <main class="layout">
@@ -36,7 +47,7 @@
     </section>
 
     <!-- 結合結果 -->
-    <section class="card">
+    <section class="card result-card">
       <h2>結合結果</h2>
       <div class="sep-row">
         <label for="separator">区切り文字</label>
@@ -61,6 +72,8 @@
       <p id="preset-empty" class="empty">保存済みのセットはありません。</p>
     </section>
   </main>
+
+  <footer class="app-footer">データはこのブラウザに自動保存されます</footer>
 
   <script src="app.js"></script>
 </body>

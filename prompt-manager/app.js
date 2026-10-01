@@ -160,7 +160,7 @@ function renderPromptItem(p, index) {
     title: '結合に含める',
     onchange: () => togglePrompt(p.id),
   });
-  li.append(checkbox);
+  li.append(checkbox, el('span', { className: 'prompt-index', textContent: String(index + 1).padStart(2, '0') }));
 
   if (editingId === p.id) {
     const input = el('input', { type: 'text', value: p.text });
