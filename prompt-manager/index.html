@@ -4,76 +4,139 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>プロンプト管理</title>
-  <meta name="theme-color" content="#07080d">
+  <meta name="theme-color" content="#dfe7f1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="app-header">
-    <div class="logo" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 17l6-6-6-6"/><path d="M12 19h8"/>
-      </svg>
-    </div>
-    <div>
-      <h1>プロンプト管理</h1>
-      <p class="subtitle">プロンプトを登録して、カンマ区切りの1つの文章にまとめます</p>
-    </div>
-  </header>
+  <div class="shell">
+    <!-- トップバー -->
+    <header class="topbar">
+      <div class="brand">Promptio</div>
+      <nav class="nav" aria-label="セクション">
+        <a href="#prompts" class="nav-link active">ダッシュボード</a>
+        <a href="#prompts" class="nav-link">プロンプト</a>
+        <a href="#output-card" class="nav-link">結合結果</a>
+        <a href="#presets" class="nav-link">セット</a>
+      </nav>
+      <div class="topbar-actions">
+        <button id="copy-top" class="icon-btn" type="button" title="結合結果をコピー" aria-label="結合結果をコピー">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+        </button>
+        <div class="avatar" aria-hidden="true">P</div>
+      </div>
+    </header>
 
-  <main class="layout">
-    <!-- プロンプト一覧 -->
-    <section class="card">
-      <h2>プロンプト</h2>
-      <form id="add-form" class="add-form">
-        <input id="add-input" type="text" placeholder="プロンプトを入力（例: masterpiece）" autocomplete="off" required>
-        <button type="submit" class="btn primary">追加</button>
-      </form>
-      <p class="hint">カンマ区切りで入力すると複数まとめて追加できます。</p>
+    <!-- ようこそ + 統計 -->
+    <section class="hero">
+      <div class="hero-left">
+        <h1>ようこそ、<span class="thin">Prompt Manager へ</span></h1>
+        <div class="segments" aria-label="選択状況">
+          <div class="seg-labels">
+            <span>選択中</span><span>未選択</span><span>セット</span>
+          </div>
+          <div class="seg-bar">
+            <span id="seg-on" class="seg dark">0%</span>
+            <span id="seg-off" class="seg light">0%</span>
+            <span id="seg-sets" class="seg outline">0</span>
+          </div>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><span id="stat-total" class="stat-num">0</span><span class="stat-label">登録プロンプト</span></div>
+        <div class="stat"><span id="stat-on" class="stat-num">0</span><span class="stat-label">選択中</span></div>
+        <div class="stat"><span id="stat-chars" class="stat-num">0</span><span class="stat-label">結合後の文字数</span></div>
+      </div>
+    </section>
 
-      <div class="list-toolbar">
-        <span id="count" class="muted"></span>
-        <div class="toolbar-actions">
+    <main class="grid">
+      <!-- プロンプト一覧 -->
+      <section id="prompts" class="card card-prompts">
+        <div class="card-head">
+          <h2>プロンプト</h2>
+          <span id="count" class="chip"></span>
+        </div>
+        <form id="add-form" class="add-form">
+          <input id="add-input" type="text" placeholder="プロンプトを入力（例: masterpiece）" autocomplete="off" required>
+          <button type="submit" class="btn primary">追加</button>
+        </form>
+        <p class="hint">カンマ区切りで入力すると複数まとめて追加できます。ダブルクリックで修正。</p>
+
+        <div class="list-toolbar">
           <button id="check-all" class="btn small">全選択</button>
           <button id="uncheck-all" class="btn small">全解除</button>
           <button id="clear-all" class="btn small danger">全削除</button>
         </div>
-      </div>
 
-      <ul id="prompt-list" class="prompt-list"></ul>
-      <p id="empty" class="empty">まだプロンプトがありません。上の入力欄から追加してください。</p>
-    </section>
+        <ul id="prompt-list" class="prompt-list"></ul>
+        <p id="empty" class="empty">まだプロンプトがありません。上の入力欄から追加してください。</p>
+      </section>
 
-    <!-- 結合結果 -->
-    <section class="card result-card">
-      <h2>結合結果</h2>
-      <div class="sep-row">
-        <label for="separator">区切り文字</label>
-        <select id="separator">
-          <option value=", ">カンマ＋スペース（, ）</option>
-          <option value=",">カンマのみ（,）</option>
-          <option value="、">読点（、）</option>
-        </select>
-      </div>
-      <textarea id="output" rows="6" readonly placeholder="チェックしたプロンプトがここに結合されます"></textarea>
-      <div class="output-actions">
-        <button id="copy" class="btn primary">コピー</button>
-        <span id="copy-status" class="muted" role="status"></span>
-      </div>
+      <!-- 結合結果 -->
+      <section id="output-card" class="card card-output">
+        <div class="card-head">
+          <h2>結合結果</h2>
+          <select id="separator" aria-label="区切り文字">
+            <option value=", ">カンマ＋スペース（, ）</option>
+            <option value=",">カンマのみ（,）</option>
+            <option value="、">読点（、）</option>
+          </select>
+        </div>
+        <textarea id="output" rows="5" readonly placeholder="チェックしたプロンプトがここに結合されます"></textarea>
+        <div class="output-actions">
+          <button id="copy" class="btn primary wide">コピー</button>
+          <span id="copy-status" class="copy-status" role="status"></span>
+        </div>
+      </section>
 
-      <h2 class="mt">セットとして保存</h2>
-      <form id="preset-form" class="add-form">
-        <input id="preset-name" type="text" placeholder="セット名（例: 風景用）" autocomplete="off" required>
-        <button type="submit" class="btn">保存</button>
-      </form>
-      <ul id="preset-list" class="preset-list"></ul>
-      <p id="preset-empty" class="empty">保存済みのセットはありません。</p>
-    </section>
-  </main>
+      <!-- 選択率リング -->
+      <section class="card card-ring">
+        <div class="card-head">
+          <h2>選択率</h2>
+        </div>
+        <div class="ring-wrap">
+          <svg class="ring" viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="ring-track" cx="60" cy="60" r="50"/>
+            <circle id="ring-value" class="ring-value" cx="60" cy="60" r="50"/>
+          </svg>
+          <div class="ring-center">
+            <span id="ring-pct" class="ring-pct">0%</span>
+            <span id="ring-sub" class="ring-sub">0 / 0 件</span>
+          </div>
+        </div>
+      </section>
 
-  <footer class="app-footer">データはこのブラウザに自動保存されます</footer>
+      <!-- 文字数バー -->
+      <section class="card card-bars">
+        <div class="card-head">
+          <h2>文字数</h2>
+          <span class="muted">プロンプトごと</span>
+        </div>
+        <div class="bars-head">
+          <span id="bars-total" class="bars-total">0</span><span class="muted">文字（選択中）</span>
+        </div>
+        <div id="bars" class="bars"></div>
+      </section>
+
+      <!-- セット（ダークカード） -->
+      <section id="presets" class="card card-presets">
+        <div class="card-head">
+          <h2>保存済みセット</h2>
+          <span id="preset-count" class="chip chip-dark">0</span>
+        </div>
+        <form id="preset-form" class="add-form">
+          <input id="preset-name" type="text" placeholder="セット名（例: 風景用）" autocomplete="off" required>
+          <button type="submit" class="btn light">保存</button>
+        </form>
+        <ul id="preset-list" class="preset-list"></ul>
+        <p id="preset-empty" class="empty">保存済みのセットはありません。</p>
+      </section>
+    </main>
+
+    <footer class="app-footer">データはこのブラウザに自動保存されます</footer>
+  </div>
 
   <script src="app.js"></script>
 </body>
