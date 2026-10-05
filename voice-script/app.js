@@ -2,7 +2,6 @@
 
 const STORAGE_KEY = 'voice-script:v1';
 const NARRATOR = 'ナレーション';
-const MAX_CHUNK = 120;   // 1 回の発話の最大文字数（長文で途切れるのを防ぐ）
 const PITCH_VARIANTS = [1, 1.3, 0.8, 1.15, 0.9, 1.45];
 
 const SAMPLE = `# サンプル台本：「#」で始まる行は読み上げません
@@ -14,13 +13,15 @@ const SAMPLE = `# サンプル台本：「#」で始まる行は読み上げま�
 （店長、コーヒーを淹れる）
 ナレーター：こうして、静かな午後が過ぎていった。`;
 
-const engine = ENGINES[0];
+let engine = ENGINES[0];
 
 // ---- 状態 ----
 let state = {
   scripts: [],          // { id, title, text }
   currentId: null,
-  speakers: {},         // 話者名 -> { voiceId, rate, pitch }
+  engineId: 'browser',
+  voiceSettings: {},    // エンジン ID -> 話者名 -> { voiceId, rate, pitch, caption }
+  irodori: { baseUrl: 'http://localhost:8088', apiKey: '' },
   volume: 1,
   gap: 0.3,             // 行と行の間（秒）
   readDirections: false,
@@ -42,6 +43,12 @@ function load() {
   } catch (e) {
     console.warn('保存データの読み込みに失敗しました', e);
   }
+  // 旧形式（エンジンが 1 つだった頃）の話者設定を移す
+  if (state.speakers) {
+    state.voiceSettings.browser = state.speakers;
+    delete state.speakers;
+  }
+  engine = ENGINES.find(e => e.id === state.engineId) || ENGINES[0];
   if (!state.scripts.length) {
     const s = { id: newId(), title: 'サンプル：喫茶店', text: SAMPLE };
     state.scripts.push(s);
@@ -90,8 +97,10 @@ function parse(text) {
   return result;
 }
 
-// 句点などで区切り、MAX_CHUNK 以下のかたまりにまとめる
+// 句点などで区切り、エンジンの maxChunk 以下のかたまりにまとめる
 function chunks(text) {
+  const MAX_CHUNK = engine.maxChunk;
+  if (text.length <= MAX_CHUNK) return [text];
   const parts = text.match(/[^。！？!?]+[。！？!?」』）)]*|[。！？!?]+/g) || [text];
   const out = [];
   let buf = '';
@@ -118,22 +127,22 @@ function speakersInScript() {
 }
 
 // ---- 声の割り当て ----
-function japaneseVoices() {
-  const all = engine.listVoices();
-  const ja = all.filter(v => v.lang.toLowerCase().startsWith('ja'));
-  return ja.length ? ja : all;
+function speakerSettings() {
+  return state.voiceSettings[engine.id] ||= {};
 }
 
 // 未設定の話者に、なるべく別々の声を割り当てる
 function ensureSpeaker(name) {
-  const voices = japaneseVoices();
-  let s = state.speakers[name];
+  const voices = engine.listVoices();
+  const all = speakerSettings();
+  let s = all[name];
   if (!s) {
-    const i = Object.keys(state.speakers).length;
+    const i = Object.keys(all).length;
     // 声が足りず同じ声を使い回すときは、高さを変えて聞き分けられるようにする
     const round = Math.floor(i / Math.max(1, voices.length));
-    s = state.speakers[name] = { voiceId: '', rate: 1, pitch: PITCH_VARIANTS[round % PITCH_VARIANTS.length], slot: i };
+    s = all[name] = { voiceId: '', rate: 1, pitch: PITCH_VARIANTS[round % PITCH_VARIANTS.length], caption: '', slot: i };
   }
+  s.caption ??= '';
   if (!voices.some(v => v.id === s.voiceId) && voices.length) {
     s.voiceId = voices[(s.slot || 0) % voices.length].id;
   }
@@ -142,7 +151,7 @@ function ensureSpeaker(name) {
 
 function speechOptions(name) {
   const s = ensureSpeaker(name);
-  return { voiceId: s.voiceId, rate: s.rate, pitch: s.pitch, volume: state.volume };
+  return { voiceId: s.voiceId, rate: s.rate, pitch: s.pitch, caption: s.caption, volume: state.volume };
 }
 
 // ---- 再生 ----
@@ -163,12 +172,22 @@ async function play(from = 0) {
       if (l.type !== 'pause' && !isReadable(l)) continue;
       player.index = i;
       renderPlayer();
+      prefetchFrom(i);
 
       if (l.type === 'pause') {
         await wait(l.seconds * 1000);
       } else {
         for (const c of chunks(l.text)) {
           if (run !== player.run) return;
+          if (engine.prefetch) {
+            // 音声の生成待ちであることを表示する
+            player.loading = true;
+            renderPlayer();
+            await engine.prefetch(c, speechOptions(l.speaker));
+            player.loading = false;
+            if (run !== player.run) return;
+            renderPlayer();
+          }
           await engine.speak(c, speechOptions(l.speaker));
         }
       }
@@ -183,9 +202,21 @@ async function play(from = 0) {
   }
 }
 
+// 生成に時間がかかるエンジン向けに、この先の数行を先に作っておく
+function prefetchFrom(i, count = 3) {
+  if (!engine.prefetch) return;
+  for (let j = i; j < lines.length && count > 0; j++) {
+    const l = lines[j];
+    if (l.type === 'pause' || !isReadable(l)) continue;
+    for (const c of chunks(l.text)) engine.prefetch(c, speechOptions(l.speaker));
+    count--;
+  }
+}
+
 function pause() {
   player.run++;
   player.playing = false;
+  player.loading = false;
   engine.stop();
   renderPlayer();
 }
@@ -193,6 +224,7 @@ function pause() {
 function stop() {
   player.run++;
   player.playing = false;
+  player.loading = false;
   player.index = -1;
   engine.stop();
   renderPlayer();
@@ -217,6 +249,7 @@ function playFromCursor() {
 
 async function preview(name) {
   stop();
+  if (engine.prefetch) showMessage('試聴用の音声を生成中…');
   try {
     await engine.speak(`${name}です。よろしくお願いします。`, speechOptions(name));
   } catch (e) {
@@ -272,7 +305,7 @@ function renderLines() {
 }
 
 function renderSpeakers() {
-  const voices = japaneseVoices();
+  const voices = engine.listVoices();
   $('#voice-count').textContent = `声 ${voices.length} 種`;
   const names = speakersInScript();
 
@@ -299,12 +332,22 @@ function renderSpeakers() {
     const test = el('button', { type: 'button', className: 'btn small', textContent: '試聴' });
     test.addEventListener('click', () => preview(name));
 
-    return el('li', { className: 'speaker' },
+    const li = el('li', { className: 'speaker' },
       el('div', { className: 'speaker-head' },
         el('span', { className: `who c${colorIndex(name)}`, textContent: name }), test),
       voiceSel,
-      slider('速さ', 'rate', 0.5, 2),
-      slider('高さ', 'pitch', 0, 2));
+      slider('速さ', 'rate', 0.5, 2));
+    if (engine.features.pitch) li.append(slider('高さ', 'pitch', 0, 2));
+    if (engine.features.caption) {
+      const caption = el('textarea', {
+        className: 'caption', rows: 2, value: s.caption,
+        placeholder: '声の説明（例: 落ち着いた低い声の中年男性。ゆっくり穏やかに話す）',
+        ariaLabel: `${name} の声の説明`,
+      });
+      caption.addEventListener('input', () => { s.caption = caption.value; save(); });
+      li.append(caption);
+    }
+    return li;
   }));
   save();
 }
@@ -317,7 +360,7 @@ function renderPlayer() {
   const readable = lines.filter(isReadable).length;
   const done = player.index < 0 ? 0 : lines.slice(0, player.index + 1).filter(isReadable).length;
   $('#progress-fill').style.width = readable ? `${(done / readable) * 100}%` : '0';
-  $('#progress-text').textContent = `${done} / ${readable} 行`;
+  $('#progress-text').textContent = `${done} / ${readable} 行${player.loading ? '（音声を生成中…）' : ''}`;
 
   for (const li of $('#lines').children) {
     const i = Number(li.dataset.index);
@@ -326,6 +369,41 @@ function renderPlayer() {
   }
   const cur = $('#lines .current');
   if (cur && player.playing) cur.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function renderEngine() {
+  $('#engine').value = engine.id;
+  const irodori = engine.id === 'irodori';
+  $('#irodori-settings').hidden = !irodori;
+  $('#unsupported').hidden = engine.isSupported();
+  document.body.classList.toggle('unsupported', !engine.isSupported());
+  $('#voice-hint').textContent = irodori
+    ? '参照音声はサーバーの voices/ フォルダに置いた音声です。「参照音声なし」のときは声の説明で声を作ります。セリフに絵文字（😊 😢 🤭 など）を入れると感情を指定できます。'
+    : '声の種類はブラウザと OS によって異なります。Edge は自然な日本語音声が多めです。';
+}
+
+async function connectIrodori() {
+  const status = $('#irodori-status');
+  status.textContent = '接続中…';
+  status.className = 'muted';
+  try {
+    const voices = await ENGINES.find(e => e.id === 'irodori').refresh();
+    status.textContent = `接続しました（声 ${voices.length} 種）`;
+    status.className = 'ok';
+  } catch (e) {
+    status.textContent = e.message;
+    status.className = 'error';
+  }
+}
+
+function selectEngine(id) {
+  stop();
+  engine = ENGINES.find(e => e.id === id) || ENGINES[0];
+  state.engineId = engine.id;
+  save();
+  renderEngine();
+  renderSpeakers();
+  if (engine.id === 'irodori' && !engine.listVoices().length) connectIrodori();
 }
 
 function refresh() {
@@ -416,6 +494,21 @@ function bind() {
   gapValue();
   $('#gap').addEventListener('input', e => { state.gap = parseFloat(e.target.value); gapValue(); save(); });
 
+  $('#engine').replaceChildren(...ENGINES.map(e => el('option', { value: e.id, textContent: e.label })));
+  $('#engine').addEventListener('change', e => selectEngine(e.target.value));
+
+  const irodori = ENGINES.find(e => e.id === 'irodori');
+  $('#irodori-url').value = state.irodori.baseUrl;
+  $('#irodori-key').value = state.irodori.apiKey;
+  for (const key of ['url', 'key']) {
+    $(`#irodori-${key}`).addEventListener('change', () => {
+      state.irodori = { baseUrl: $('#irodori-url').value.trim(), apiKey: $('#irodori-key').value.trim() };
+      irodori.configure(state.irodori);
+      save();
+    });
+  }
+  $('#irodori-connect').addEventListener('click', connectIrodori);
+
   $('#read-directions').checked = state.readDirections;
   $('#read-directions').addEventListener('change', e => {
     state.readDirections = e.target.checked;
@@ -427,11 +520,10 @@ function bind() {
 
 // ---- 起動 ----
 load();
-if (!engine.isSupported()) {
-  $('#unsupported').hidden = false;
-  document.body.classList.add('unsupported');
-}
-engine.init(renderSpeakers);
+ENGINES.find(e => e.id === 'irodori').configure(state.irodori);
+for (const e of ENGINES) e.init(() => { if (e === engine) renderSpeakers(); });
 bind();
+renderEngine();
 renderScripts();
 refresh();
+if (engine.id === 'irodori') connectIrodori();

@@ -48,6 +48,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 html { color-scheme: light dark; }
 
@@ -117,7 +118,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn.small { padding: 4px 12px; font-size: 0.85rem; }
 .btn.danger { color: var(--danger); }
 
-select, input[type="text"], textarea {
+select, input[type="text"], input[type="password"], textarea {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--field);
@@ -196,6 +197,21 @@ body.unsupported .player button { opacity: 0.4; pointer-events: none; }
   font-size: 0.9rem;
 }
 .player-settings label { display: flex; align-items: center; gap: 8px; }
+.player-settings select { max-width: 100%; }
+.server-settings {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+.server-settings label { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.server-settings input { width: 220px; max-width: 100%; }
+.server-settings .ok { color: var(--c2); }
+.server-settings .error { color: var(--danger); }
 
 /* ---- レイアウト ---- */
 .grid {
@@ -273,6 +289,15 @@ body.unsupported .player button { opacity: 0.4; pointer-events: none; }
 }
 .speaker-head { display: flex; justify-content: space-between; align-items: center; }
 .speaker select { width: 100%; }
+.speaker .caption {
+  width: 100%;
+  resize: vertical;
+  font-size: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--field);
+  padding: 6px 10px;
+}
 .slider { display: grid; grid-template-columns: 2.5em 1fr 3em; align-items: center; gap: 8px; font-size: 0.85rem; }
 
 .app-footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 24px 0 8px; }
@@ -289,4 +314,6 @@ body.unsupported .player button { opacity: 0.4; pointer-events: none; }
   .lines { max-height: 360px; }
   .script-picker { width: 100%; }
   .script-picker select { flex: 1; max-width: none; }
+  .player-settings label, .server-settings label { flex-wrap: wrap; }
+  .server-settings input { width: 100%; }
 }
