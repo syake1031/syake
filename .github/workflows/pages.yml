@@ -1,4 +1,4 @@
-name: Deploy prompt-manager to GitHub Pages
+name: Deploy web apps to GitHub Pages
 
 on:
   push:
@@ -25,8 +25,14 @@ jobs:
       - uses: actions/configure-pages@v5
         with:
           enablement: true
+      # prompt-manager はサイト直下、voice-script は /voice-script/ に配置する
+      - name: Assemble site
+        run: |
+          mkdir _site
+          cp -r prompt-manager/. _site/
+          cp -r voice-script _site/voice-script
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: prompt-manager
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4

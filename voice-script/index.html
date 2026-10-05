@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>台本読み上げ</title>
+  <meta name="theme-color" content="#1f3a68">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="shell">
+    <!-- トップバー -->
+    <header class="topbar">
+      <div class="brand">Voice Script</div>
+      <div class="script-picker">
+        <select id="script-select" aria-label="台本を選択"></select>
+        <button id="new-script" class="btn small" type="button">新規</button>
+        <button id="delete-script" class="btn small danger" type="button">削除</button>
+      </div>
+    </header>
+
+    <p id="unsupported" class="alert" hidden>
+      このブラウザは音声読み上げ（Web Speech API）に対応していません。Chrome / Edge / Safari の最新版でお試しください。
+    </p>
+
+    <!-- 再生コントロール -->
+    <section class="card player" aria-label="再生コントロール">
+      <div class="player-buttons">
+        <button id="prev" class="icon-btn" type="button" title="前の行" aria-label="前の行">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg>
+        </button>
+        <button id="play" class="icon-btn play" type="button" title="再生" aria-label="再生">
+          <svg class="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>
+          <svg class="i-pause" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+        </button>
+        <button id="stop" class="icon-btn" type="button" title="停止" aria-label="停止">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
+        </button>
+        <button id="next" class="icon-btn" type="button" title="次の行" aria-label="次の行">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg>
+        </button>
+        <button id="play-cursor" class="btn small" type="button" title="エディタのカーソルがある行から再生">カーソル行から再生</button>
+      </div>
+      <div class="progress">
+        <div class="progress-bar"><span id="progress-fill"></span></div>
+        <span id="progress-text" class="muted">0 / 0 行</span>
+      </div>
+      <div class="player-settings">
+        <label>音量 <input id="volume" type="range" min="0" max="1" step="0.05"></label>
+        <label>行間 <input id="gap" type="range" min="0" max="2" step="0.1"> <span id="gap-value" class="muted"></span></label>
+        <label class="check"><input id="read-directions" type="checkbox"> ト書きも読む</label>
+      </div>
+    </section>
+
+    <main class="grid">
+      <!-- 台本エディタ -->
+      <section class="card editor">
+        <div class="card-head">
+          <input id="title" class="title-input" type="text" placeholder="台本のタイトル" aria-label="台本のタイトル">
+          <div class="file-actions">
+            <label class="btn small">開く<input id="file-input" type="file" accept=".txt,text/plain" hidden></label>
+            <button id="export" class="btn small" type="button">書き出し</button>
+          </div>
+        </div>
+        <textarea id="script" spellcheck="false" placeholder="話者：セリフ の形式で入力します"></textarea>
+        <details class="syntax">
+          <summary>台本の書き方</summary>
+          <ul>
+            <li><code>話者：セリフ</code> … 話者ごとに声を変えて読みます（<code>:</code> 半角でも可）</li>
+            <li>話者のない行 … 「ナレーション」として読みます</li>
+            <li><code>[間 1.5]</code> … 指定秒数だけ無音（<code>[間]</code> だけなら 1 秒）</li>
+            <li><code>（ト書き）</code> … 行全体が括弧なら読み飛ばします（設定で読み上げも可）</li>
+            <li><code># コメント</code> … 読み上げません</li>
+          </ul>
+        </details>
+      </section>
+
+      <!-- 読み上げビュー -->
+      <section class="card reader">
+        <div class="card-head">
+          <h2>台本ビュー</h2>
+          <span class="muted">行をクリックでそこから再生</span>
+        </div>
+        <ol id="lines" class="lines"></ol>
+        <p id="lines-empty" class="empty">左のエディタに台本を入力してください。</p>
+      </section>
+
+      <!-- 話者設定 -->
+      <section class="card speakers">
+        <div class="card-head">
+          <h2>話者と声</h2>
+          <span id="voice-count" class="chip"></span>
+        </div>
+        <ul id="speaker-list" class="speaker-list"></ul>
+        <p class="hint">声の種類はブラウザと OS によって異なります。Edge は自然な日本語音声が多めです。</p>
+      </section>
+    </main>
+
+    <footer class="app-footer">台本と設定はこのブラウザに自動保存されます</footer>
+  </div>
+
+  <script src="engines.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
